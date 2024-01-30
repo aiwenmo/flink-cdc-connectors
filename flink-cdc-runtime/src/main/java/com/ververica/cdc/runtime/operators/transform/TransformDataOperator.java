@@ -167,7 +167,7 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
                             applyProjection(projectorOptional.get(), dataChangeEventOptional.get());
                 }
                 Optional<RowFilter> rowFilterOptional = transform.f2;
-                if (rowFilterOptional.isPresent() && rowFilterOptional.get().isVaild()) {
+                if (rowFilterOptional.isPresent() && rowFilterOptional.get().isValid()) {
                     dataChangeEventOptional =
                             applyFilter(rowFilterOptional.get(), dataChangeEventOptional.get());
                 }
