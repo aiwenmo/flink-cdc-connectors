@@ -108,24 +108,19 @@ public class FlinkPipelineComposer implements PipelineComposer {
         // Create sink in advance as schema operator requires MetadataApplier
         DataSink dataSink = createDataSink(pipelineDef.getSink(), pipelineDef.getConfig());
 
-        // Schema operator
+        // Route
+        RouteTranslator routeTranslator = new RouteTranslator();
+        stream = routeTranslator.translate(stream, pipelineDef.getRoute(), parallelism);
+
+        // Create translator in advance to generate OperatorIDGenerator
         SchemaOperatorTranslator schemaOperatorTranslator =
                 new SchemaOperatorTranslator(
                         pipelineDef
                                 .getConfig()
                                 .get(PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR),
                         pipelineDef.getConfig().get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID));
-        stream =
-                schemaOperatorTranslator.translate(
-                        stream, parallelism, dataSink.getMetadataApplier());
         OperatorIDGenerator schemaOperatorIDGenerator =
                 new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());
-
-        // Add partitioner
-        PartitioningTranslator partitioningTranslator = new PartitioningTranslator();
-        stream =
-                partitioningTranslator.translate(
-                        stream, parallelism, parallelism, schemaOperatorIDGenerator.generate());
 
         // Transform Data
         stream =
@@ -135,9 +130,16 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         parallelism,
                         schemaOperatorIDGenerator.generate());
 
-        // Route
-        RouteTranslator routeTranslator = new RouteTranslator();
-        stream = routeTranslator.translate(stream, pipelineDef.getRoute(), parallelism);
+        // Schema operator
+        stream =
+                schemaOperatorTranslator.translate(
+                        stream, parallelism, dataSink.getMetadataApplier());
+
+        // Add partitioner
+        PartitioningTranslator partitioningTranslator = new PartitioningTranslator();
+        stream =
+                partitioningTranslator.translate(
+                        stream, parallelism, parallelism, schemaOperatorIDGenerator.generate());
 
         // Sink
         DataSinkTranslator sinkTranslator = new DataSinkTranslator();
