@@ -105,39 +105,38 @@ public class FlinkPipelineComposer implements PipelineComposer {
         TransformTranslator transformTranslator = new TransformTranslator();
         stream = transformTranslator.translateSchema(stream, pipelineDef.getTransforms());
 
-        // Create sink in advance as schema operator requires MetadataApplier
-        DataSink dataSink = createDataSink(pipelineDef.getSink(), pipelineDef.getConfig());
-
-        // Schema operator
         SchemaOperatorTranslator schemaOperatorTranslator =
                 new SchemaOperatorTranslator(
                         pipelineDef
                                 .getConfig()
                                 .get(PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR),
                         pipelineDef.getConfig().get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID));
+
+        OperatorIDGenerator schemaOperatorIDGenerator =
+                new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());
+
+        // Transform Data
+        stream =
+                transformTranslator.translateData(
+                        stream, pipelineDef.getTransforms(), schemaOperatorIDGenerator.generate());
+
+        // Route
+        RouteTranslator routeTranslator = new RouteTranslator();
+        stream = routeTranslator.translate(stream, pipelineDef.getRoute());
+
+        // Create sink in advance as schema operator requires MetadataApplier
+        DataSink dataSink = createDataSink(pipelineDef.getSink(), pipelineDef.getConfig());
+
+        // schemaOperator
         stream =
                 schemaOperatorTranslator.translate(
                         stream, parallelism, dataSink.getMetadataApplier());
-        OperatorIDGenerator schemaOperatorIDGenerator =
-                new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());
 
         // Add partitioner
         PartitioningTranslator partitioningTranslator = new PartitioningTranslator();
         stream =
                 partitioningTranslator.translate(
                         stream, parallelism, parallelism, schemaOperatorIDGenerator.generate());
-
-        // Transform Data
-        stream =
-                transformTranslator.translateData(
-                        stream,
-                        pipelineDef.getTransforms(),
-                        parallelism,
-                        schemaOperatorIDGenerator.generate());
-
-        // Route
-        RouteTranslator routeTranslator = new RouteTranslator();
-        stream = routeTranslator.translate(stream, pipelineDef.getRoute(), parallelism);
 
         // Sink
         DataSinkTranslator sinkTranslator = new DataSinkTranslator();

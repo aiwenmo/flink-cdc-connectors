@@ -49,10 +49,7 @@ public class TransformTranslator {
     }
 
     public DataStream<Event> translateData(
-            DataStream<Event> input,
-            List<TransformDef> transforms,
-            int parallelism,
-            OperatorID schemaOperatorID) {
+            DataStream<Event> input, List<TransformDef> transforms, OperatorID schemaOperatorID) {
         if (transforms.isEmpty()) {
             return input;
         }
@@ -69,8 +66,6 @@ public class TransformTranslator {
         }
         transformDataFunctionBuilder.addSchemaOperatorID(schemaOperatorID);
         return input.transform(
-                        "Transform:Data", new EventTypeInfo(), transformDataFunctionBuilder.build())
-                .setParallelism(parallelism)
-                .forward();
+                "Transform:Data", new EventTypeInfo(), transformDataFunctionBuilder.build());
     }
 }
