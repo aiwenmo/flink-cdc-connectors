@@ -16,9 +16,9 @@
 
 package com.ververica.cdc.runtime.parser.validate;
 
-import com.ververica.cdc.runtime.functions.BuiltInSqlFunction;
-import com.ververica.cdc.runtime.functions.FlinkCDCTimestampFunction;
-import com.ververica.cdc.runtime.functions.FlinkReturnTypes;
+import com.ververica.cdc.runtime.functions.BuiltInScalarFunction;
+import com.ververica.cdc.runtime.functions.BuiltInTimestampFunction;
+import com.ververica.cdc.runtime.functions.FlinkCDCReturnTypes;
 import org.apache.calcite.sql.SqlFunction;
 import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlIdentifier;
@@ -73,7 +73,7 @@ public class FlinkCDCOperatorTable extends ReflectiveSqlOperatorTable {
     }
 
     public static final SqlFunction CONCAT_FUNCTION =
-            BuiltInSqlFunction.newBuilder()
+            BuiltInScalarFunction.newBuilder()
                     .name("CONCAT")
                     .returnType(
                             ReturnTypes.cascade(
@@ -83,14 +83,14 @@ public class FlinkCDCOperatorTable extends ReflectiveSqlOperatorTable {
                             OperandTypes.repeat(SqlOperandCountRanges.from(1), OperandTypes.STRING))
                     .build();
     public static final SqlFunction LOCALTIMESTAMP =
-            new FlinkCDCTimestampFunction("LOCALTIMESTAMP", SqlTypeName.TIMESTAMP, 3);
+            new BuiltInTimestampFunction("LOCALTIMESTAMP", SqlTypeName.TIMESTAMP, 3);
     public static final SqlFunction CURRENT_TIMESTAMP =
-            new FlinkCDCTimestampFunction(
+            new BuiltInTimestampFunction(
                     "CURRENT_TIMESTAMP", SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE, 3);
     public static final SqlFunction CURRENT_DATE =
-            new FlinkCDCTimestampFunction("CURRENT_DATE", SqlTypeName.DATE, 0);
+            new BuiltInTimestampFunction("CURRENT_DATE", SqlTypeName.DATE, 0);
     public static final SqlFunction NOW =
-            new FlinkCDCTimestampFunction("NOW", SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE, 3) {
+            new BuiltInTimestampFunction("NOW", SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE, 3) {
                 @Override
                 public SqlSyntax getSyntax() {
                     return SqlSyntax.FUNCTION;
@@ -135,7 +135,7 @@ public class FlinkCDCOperatorTable extends ReflectiveSqlOperatorTable {
             new SqlFunction(
                     "SUBSTR",
                     SqlKind.OTHER_FUNCTION,
-                    FlinkReturnTypes.ARG0_VARCHAR_FORCE_NULLABLE,
+                    FlinkCDCReturnTypes.ARG0_VARCHAR_FORCE_NULLABLE,
                     null,
                     OperandTypes.or(
                             OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.INTEGER),
@@ -148,12 +148,12 @@ public class FlinkCDCOperatorTable extends ReflectiveSqlOperatorTable {
             new SqlFunction(
                     "ROUND",
                     SqlKind.OTHER_FUNCTION,
-                    FlinkReturnTypes.ROUND_FUNCTION_NULLABLE,
+                    FlinkCDCReturnTypes.ROUND_FUNCTION_NULLABLE,
                     null,
                     OperandTypes.or(OperandTypes.NUMERIC_INTEGER, OperandTypes.NUMERIC),
                     SqlFunctionCategory.NUMERIC);
     public static final SqlFunction UUID =
-            BuiltInSqlFunction.newBuilder()
+            BuiltInScalarFunction.newBuilder()
                     .name("UUID")
                     .returnType(ReturnTypes.explicit(SqlTypeName.CHAR, 36))
                     .operandTypeChecker(OperandTypes.NILADIC)

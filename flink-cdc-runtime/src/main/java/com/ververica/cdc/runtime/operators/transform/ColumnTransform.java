@@ -21,8 +21,8 @@ import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.utils.StringUtils;
-import com.ververica.cdc.runtime.parser.FlinkSqlParser;
 import com.ververica.cdc.runtime.parser.JaninoParser;
+import com.ververica.cdc.runtime.parser.TransformParser;
 import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
 import org.codehaus.janino.ExpressionEvaluator;
 import org.slf4j.Logger;
@@ -35,6 +35,7 @@ import java.util.List;
 
 /** The ColumnTransform applies to describe the information of the transformation column. */
 public class ColumnTransform implements Serializable {
+    private static final long serialVersionUID = 1L;
     private static final Logger LOG = LoggerFactory.getLogger(ColumnTransform.class);
     private final Column column;
     private final String expression;
@@ -101,11 +102,11 @@ public class ColumnTransform implements Serializable {
                 }
             }
         }
-        if (scriptExpression.contains(FlinkSqlParser.DEFAULT_DATABASE_NAME)) {
+        if (scriptExpression.contains(TransformParser.DEFAULT_DATABASE_NAME)) {
             params.add(tableInfo.getSchemaName());
         }
 
-        if (scriptExpression.contains(FlinkSqlParser.DEFAULT_TABLE_NAME)) {
+        if (scriptExpression.contains(TransformParser.DEFAULT_TABLE_NAME)) {
             params.add(tableInfo.getTableName());
         }
         return params.toArray();
@@ -125,13 +126,13 @@ public class ColumnTransform implements Serializable {
                 }
             }
         }
-        if (scriptExpression.contains(FlinkSqlParser.DEFAULT_DATABASE_NAME)) {
-            argumentNames.add(FlinkSqlParser.DEFAULT_DATABASE_NAME);
+        if (scriptExpression.contains(TransformParser.DEFAULT_DATABASE_NAME)) {
+            argumentNames.add(TransformParser.DEFAULT_DATABASE_NAME);
             paramTypes.add(String.class);
         }
 
-        if (scriptExpression.contains(FlinkSqlParser.DEFAULT_TABLE_NAME)) {
-            argumentNames.add(FlinkSqlParser.DEFAULT_TABLE_NAME);
+        if (scriptExpression.contains(TransformParser.DEFAULT_TABLE_NAME)) {
+            argumentNames.add(TransformParser.DEFAULT_TABLE_NAME);
             paramTypes.add(String.class);
         }
         expressionEvaluator =

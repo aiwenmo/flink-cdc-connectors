@@ -22,7 +22,7 @@ import com.ververica.cdc.common.event.CreateTableEvent;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.utils.StringUtils;
-import com.ververica.cdc.runtime.parser.FlinkSqlParser;
+import com.ververica.cdc.runtime.parser.TransformParser;
 import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
 
 import java.util.ArrayList;
@@ -63,7 +63,7 @@ public class Projector {
 
     public CreateTableEvent applyCreateTableEvent(CreateTableEvent createTableEvent) {
         columnTransformList =
-                FlinkSqlParser.generateColumnTransforms(
+                TransformParser.generateColumnTransforms(
                         projection, createTableEvent.getSchema().getColumns());
         List<Column> allColumnList = getAllColumnList();
         // add the column of projection into Schema
@@ -73,7 +73,7 @@ public class Projector {
 
     public void applySchemaChangeEvent(Schema schema) {
         columnTransformList =
-                FlinkSqlParser.generateColumnTransforms(projection, schema.getColumns());
+                TransformParser.generateColumnTransforms(projection, schema.getColumns());
     }
 
     public BinaryRecordData recordFillDataField(

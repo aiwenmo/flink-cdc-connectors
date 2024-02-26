@@ -39,7 +39,7 @@ import com.ververica.cdc.common.schema.Selectors;
 import com.ververica.cdc.common.utils.SchemaUtils;
 import com.ververica.cdc.common.utils.StringUtils;
 import com.ververica.cdc.runtime.operators.sink.SchemaEvolutionClient;
-import com.ververica.cdc.runtime.parser.FlinkSqlParser;
+import com.ververica.cdc.runtime.parser.TransformParser;
 
 import javax.annotation.Nullable;
 
@@ -197,14 +197,14 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
 
     private Optional<DataChangeEvent> applyDataChangeEvent(DataChangeEvent dataChangeEvent)
             throws Exception {
-        Optional<DataChangeEvent> dataChangeEventOptional = Optional.of(dataChangeEvent);
         TableId tableId = dataChangeEvent.tableId();
-
+        List<Optional<DataChangeEvent>> transformedDataChangeEventOptionalList = new ArrayList<>();
         for (Tuple4<Selectors, Optional<Projector>, Optional<RowFilter>, Boolean> transform :
                 transforms) {
             Selectors selectors = transform.f0;
             Boolean isPreProjection = transform.f3;
             if (selectors.isMatch(tableId)) {
+                Optional<DataChangeEvent> dataChangeEventOptional = Optional.of(dataChangeEvent);
                 Optional<Projector> projectorOptional = transform.f1;
                 if (isPreProjection
                         && projectorOptional.isPresent()
@@ -224,9 +224,20 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
                     dataChangeEventOptional =
                             applyProjection(projectorOptional.get(), dataChangeEventOptional.get());
                 }
+                transformedDataChangeEventOptionalList.add(dataChangeEventOptional);
             }
         }
-        return dataChangeEventOptional;
+        if (transformedDataChangeEventOptionalList.isEmpty()) {
+            return Optional.of(dataChangeEvent);
+        } else {
+            for (Optional<DataChangeEvent> dataChangeEventOptional :
+                    transformedDataChangeEventOptionalList) {
+                if (dataChangeEventOptional.isPresent()) {
+                    return dataChangeEventOptional;
+                }
+            }
+            return Optional.empty();
+        }
     }
 
     private Optional<DataChangeEvent> applyFilter(
@@ -257,18 +268,18 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
         BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
         BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
         if (before != null) {
-            BinaryRecordData data =
+            BinaryRecordData projectedBefore =
                     projector.recordData(
                             before,
                             getTableInfoFromSchemaEvolutionClient(dataChangeEvent.tableId()));
-            dataChangeEvent = DataChangeEvent.resetBefore(dataChangeEvent, data);
+            dataChangeEvent = DataChangeEvent.projectBefore(dataChangeEvent, projectedBefore);
         }
         if (after != null) {
-            BinaryRecordData data =
+            BinaryRecordData projectedAfter =
                     projector.recordData(
                             after,
                             getTableInfoFromSchemaEvolutionClient(dataChangeEvent.tableId()));
-            dataChangeEvent = DataChangeEvent.resetAfter(dataChangeEvent, data);
+            dataChangeEvent = DataChangeEvent.projectAfter(dataChangeEvent, projectedAfter);
         }
         return Optional.of(dataChangeEvent);
     }
@@ -279,8 +290,8 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
                 || StringUtils.isNullOrWhitespaceOnly(filter)) {
             return contain;
         }
-        List<String> computedColumnNames = FlinkSqlParser.parseComputedColumnNames(projection);
-        List<String> filteredColumnNames = FlinkSqlParser.parseFilterColumnNameList(filter);
+        List<String> computedColumnNames = TransformParser.parseComputedColumnNames(projection);
+        List<String> filteredColumnNames = TransformParser.parseFilterColumnNameList(filter);
         for (String computedColumnName : computedColumnNames) {
             if (filteredColumnNames.contains(computedColumnName)) {
                 return true;

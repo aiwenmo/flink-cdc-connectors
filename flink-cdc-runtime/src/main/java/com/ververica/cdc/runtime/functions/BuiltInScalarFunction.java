@@ -48,7 +48,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * <p>For simple functions, use the provided builder. Otherwise, this class can also be extended.
  */
 @Internal
-public class BuiltInSqlFunction extends SqlFunction {
+public class BuiltInScalarFunction extends SqlFunction {
 
     private final @Nullable Integer version;
 
@@ -58,7 +58,7 @@ public class BuiltInSqlFunction extends SqlFunction {
 
     private final Function<SqlOperatorBinding, SqlMonotonicity> monotonicity;
 
-    protected BuiltInSqlFunction(
+    protected BuiltInScalarFunction(
             String name,
             int version,
             SqlKind kind,
@@ -83,7 +83,7 @@ public class BuiltInSqlFunction extends SqlFunction {
         validateFunction(name, version, isInternal);
     }
 
-    protected BuiltInSqlFunction(
+    protected BuiltInScalarFunction(
             String name,
             SqlKind kind,
             SqlReturnTypeInference returnTypeInference,
@@ -103,7 +103,7 @@ public class BuiltInSqlFunction extends SqlFunction {
                 call -> SqlMonotonicity.NOT_MONOTONIC);
     }
 
-    /** Builder for configuring and creating instances of {@link BuiltInSqlFunction}. */
+    /** Builder for configuring and creating instances of {@link BuiltInScalarFunction}. */
     public static Builder newBuilder() {
         return new Builder();
     }
@@ -220,8 +220,8 @@ public class BuiltInSqlFunction extends SqlFunction {
             return this;
         }
 
-        public BuiltInSqlFunction build() {
-            return new BuiltInSqlFunction(
+        public BuiltInScalarFunction build() {
+            return new BuiltInScalarFunction(
                     name,
                     version,
                     kind,

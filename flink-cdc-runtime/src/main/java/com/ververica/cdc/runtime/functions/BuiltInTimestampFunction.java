@@ -29,12 +29,12 @@ import org.apache.calcite.sql.type.SqlTypeName;
  * precision of return type.
  */
 @Internal
-public class FlinkCDCTimestampFunction extends SqlAbstractTimeFunction {
+public class BuiltInTimestampFunction extends SqlAbstractTimeFunction {
 
     private final SqlTypeName returnTypeName;
     private final int precision;
 
-    public FlinkCDCTimestampFunction(
+    public BuiltInTimestampFunction(
             String functionName, SqlTypeName returnTypeName, int precision) {
         // access protected constructor
         super(functionName, returnTypeName);

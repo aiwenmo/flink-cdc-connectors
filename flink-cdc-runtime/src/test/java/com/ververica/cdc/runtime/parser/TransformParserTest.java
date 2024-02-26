@@ -52,8 +52,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-/** Unit tests for the {@link FlinkSqlParser}. */
-public class FlinkSqlParserTest {
+/** Unit tests for the {@link TransformParser}. */
+public class TransformParserTest {
 
     private static final Schema CUSTOMERS_SCHEMA =
             Schema.newBuilder()
@@ -65,7 +65,7 @@ public class FlinkSqlParserTest {
     @Test
     public void testCalciteParser() {
         SqlSelect parse =
-                FlinkSqlParser.parseSelect(
+                TransformParser.parseSelect(
                         "select CONCAT(id, order_id) as uniq_id, * from tb where uniq_id > 10 and id is not null");
         Assert.assertEquals(
                 "`CONCAT`(`id`, `order_id`) AS `uniq_id`, *", parse.getSelectList().toString());
@@ -75,7 +75,7 @@ public class FlinkSqlParserTest {
     @Test
     public void testFlinkCalciteValidate() {
         SqlSelect parse =
-                FlinkSqlParser.parseSelect(
+                TransformParser.parseSelect(
                         "select SUBSTR(id, 1) as uniq_id, * from tb where id is not null");
 
         CalciteSchema rootSchema = CalciteSchema.createRootSchema(true);
@@ -115,7 +115,7 @@ public class FlinkSqlParserTest {
     @Test
     public void testCalciteRelNode() {
         SqlSelect parse =
-                FlinkSqlParser.parseSelect(
+                TransformParser.parseSelect(
                         "select SUBSTR(id, 1) as uniq_id, * from tb where id is not null");
 
         CalciteSchema rootSchema = CalciteSchema.createRootSchema(true);
@@ -173,14 +173,14 @@ public class FlinkSqlParserTest {
     @Test
     public void testParseComputedColumnNames() {
         List<String> computedColumnNames =
-                FlinkSqlParser.parseComputedColumnNames("CONCAT(id, order_id) as uniq_id, *");
+                TransformParser.parseComputedColumnNames("CONCAT(id, order_id) as uniq_id, *");
         Assert.assertEquals(new String[] {"uniq_id"}, computedColumnNames.toArray());
     }
 
     @Test
     public void testParseFilterColumnNameList() {
         List<String> computedColumnNames =
-                FlinkSqlParser.parseFilterColumnNameList(" uniq_id > 10 and id is not null");
+                TransformParser.parseFilterColumnNameList(" uniq_id > 10 and id is not null");
         Assert.assertEquals(new String[] {"uniq_id", "id"}, computedColumnNames.toArray());
     }
 
@@ -266,7 +266,7 @@ public class FlinkSqlParserTest {
 
     private void testFilterExpression(String expression, String expressionExpect) {
         String janinoExpression =
-                FlinkSqlParser.translateFilterExpressionToJaninoExpression(expression);
+                TransformParser.translateFilterExpressionToJaninoExpression(expression);
         Assert.assertEquals(expressionExpect, janinoExpression);
     }
 }

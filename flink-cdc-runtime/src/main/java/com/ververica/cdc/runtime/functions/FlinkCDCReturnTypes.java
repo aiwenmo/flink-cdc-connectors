@@ -33,7 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /** Type inference in Flink. */
-public class FlinkReturnTypes {
+public class FlinkCDCReturnTypes {
 
     /** ROUND(num [,len]) type inference. */
     public static final SqlReturnTypeInference ROUND_FUNCTION =

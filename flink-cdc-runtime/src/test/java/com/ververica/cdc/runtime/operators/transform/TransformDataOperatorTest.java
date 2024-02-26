@@ -156,6 +156,111 @@ public class TransformDataOperatorTest {
     }
 
     @Test
+    void testDataChangeEventTransformTwice() throws Exception {
+        TransformDataOperator transform =
+                TransformDataOperator.newBuilder()
+                        .addTransform(
+                                CUSTOMERS_TABLEID.identifier(),
+                                "*, concat(col1, '1') col12",
+                                "col1 = '1'")
+                        .addTransform(
+                                CUSTOMERS_TABLEID.identifier(),
+                                "*, concat(col1, '2') col12",
+                                "col1 = '2'")
+                        .build();
+        EventOperatorTestHarness<TransformDataOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        new EventOperatorTestHarness<>(transform, 1);
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA);
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) CUSTOMERS_SCHEMA.toRowDataType()));
+        // Insert
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        CUSTOMERS_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"), new BinaryStringData("2"), null
+                                }));
+        DataChangeEvent insertEventExpect =
+                DataChangeEvent.insertEvent(
+                        CUSTOMERS_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"),
+                                    new BinaryStringData("2"),
+                                    new BinaryStringData("11")
+                                }));
+        // Insert
+        DataChangeEvent insertEvent2 =
+                DataChangeEvent.insertEvent(
+                        CUSTOMERS_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("2"), new BinaryStringData("2"), null
+                                }));
+        DataChangeEvent insertEvent2Expect =
+                DataChangeEvent.insertEvent(
+                        CUSTOMERS_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("2"),
+                                    new BinaryStringData("2"),
+                                    new BinaryStringData("22")
+                                }));
+        // Update
+        DataChangeEvent updateEvent =
+                DataChangeEvent.updateEvent(
+                        CUSTOMERS_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"), new BinaryStringData("2"), null
+                                }),
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"), new BinaryStringData("3"), null
+                                }));
+        DataChangeEvent updateEventExpect =
+                DataChangeEvent.updateEvent(
+                        CUSTOMERS_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"),
+                                    new BinaryStringData("2"),
+                                    new BinaryStringData("11")
+                                }),
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"),
+                                    new BinaryStringData("3"),
+                                    new BinaryStringData("11")
+                                }));
+
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA)));
+        transform.processElement(new StreamRecord<>(insertEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEventExpect));
+        transform.processElement(new StreamRecord<>(insertEvent2));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEvent2Expect));
+        transform.processElement(new StreamRecord<>(updateEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(updateEventExpect));
+    }
+
+    @Test
     void testDataChangeEventTransformProjectionDataTypeConvert() throws Exception {
         TransformDataOperator transform =
                 TransformDataOperator.newBuilder()

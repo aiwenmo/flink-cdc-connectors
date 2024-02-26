@@ -142,10 +142,11 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
      * Updates the before of a {@link DataChangeEvent} instance that describes the event with meta
      * info.
      */
-    public static DataChangeEvent resetBefore(DataChangeEvent dataChangeEvent, RecordData before) {
+    public static DataChangeEvent projectBefore(
+            DataChangeEvent dataChangeEvent, RecordData projectedBefore) {
         return new DataChangeEvent(
                 dataChangeEvent.tableId,
-                before,
+                projectedBefore,
                 dataChangeEvent.after,
                 dataChangeEvent.op,
                 dataChangeEvent.meta);
@@ -155,11 +156,12 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
      * Updates the after of a {@link DataChangeEvent} instance that describes the event with meta
      * info.
      */
-    public static DataChangeEvent resetAfter(DataChangeEvent dataChangeEvent, RecordData after) {
+    public static DataChangeEvent projectAfter(
+            DataChangeEvent dataChangeEvent, RecordData projectedAfter) {
         return new DataChangeEvent(
                 dataChangeEvent.tableId,
                 dataChangeEvent.before,
-                after,
+                projectedAfter,
                 dataChangeEvent.op,
                 dataChangeEvent.meta);
     }

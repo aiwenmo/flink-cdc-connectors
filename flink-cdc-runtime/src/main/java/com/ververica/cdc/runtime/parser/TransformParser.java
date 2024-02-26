@@ -65,8 +65,8 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 
 /** Use Flink's calcite parser to parse the statement of flink cdc pipeline transform. */
-public class FlinkSqlParser {
-    private static final Logger LOG = LoggerFactory.getLogger(FlinkSqlParser.class);
+public class TransformParser {
+    private static final Logger LOG = LoggerFactory.getLogger(TransformParser.class);
     private static final String DEFAULT_SCHEMA = "default_schema";
     private static final String DEFAULT_TABLE = "TB";
     public static final String DEFAULT_DATABASE_NAME = "__database_name__";
@@ -230,7 +230,7 @@ public class FlinkSqlParser {
         if (StringUtils.isNullOrWhitespaceOnly(filterExpression)) {
             return "";
         }
-        SqlSelect sqlSelect = FlinkSqlParser.parseFilterExpression(filterExpression);
+        SqlSelect sqlSelect = TransformParser.parseFilterExpression(filterExpression);
         if (!sqlSelect.hasWhere()) {
             return "";
         }

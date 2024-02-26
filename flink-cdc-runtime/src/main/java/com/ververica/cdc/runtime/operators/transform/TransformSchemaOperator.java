@@ -204,12 +204,13 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
         BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
         BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
         if (before != null) {
-            BinaryRecordData data = projector.recordFillDataField(before, tableChangeInfo);
-            dataChangeEvent = DataChangeEvent.resetBefore(dataChangeEvent, data);
+            BinaryRecordData projectedBefore =
+                    projector.recordFillDataField(before, tableChangeInfo);
+            dataChangeEvent = DataChangeEvent.projectBefore(dataChangeEvent, projectedBefore);
         }
         if (after != null) {
-            BinaryRecordData data = projector.recordFillDataField(after, tableChangeInfo);
-            dataChangeEvent = DataChangeEvent.resetAfter(dataChangeEvent, data);
+            BinaryRecordData projectedAfter = projector.recordFillDataField(after, tableChangeInfo);
+            dataChangeEvent = DataChangeEvent.projectAfter(dataChangeEvent, projectedAfter);
         }
         return dataChangeEvent;
     }

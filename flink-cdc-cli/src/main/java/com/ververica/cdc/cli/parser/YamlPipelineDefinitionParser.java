@@ -175,6 +175,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                 Optional.ofNullable(transformNode.get(TRANSFORM_PROJECTION_KEY))
                         .map(JsonNode::asText)
                         .orElse(null);
+        // When the star is in the first place, a backslash needs to be added for escape.
         if (!StringUtils.isNullOrWhitespaceOnly(projection) && projection.contains("\\*")) {
             projection = projection.replace("\\*", "*");
         }

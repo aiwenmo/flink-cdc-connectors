@@ -21,7 +21,20 @@ import com.ververica.cdc.common.utils.StringUtils;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Definition of transformation. */
+/**
+ * Definition of a transformation.
+ *
+ * <p>A transformation definition contains:
+ *
+ * <ul>
+ *   <li>sourceTable: a regex pattern for matching input table IDs. Required for the definition.
+ *   <li>projection: a string for projecting the row of matched table as output. Optional for the
+ *       definition.
+ *   <li>filter: a string for filtering the row of matched table as output. Optional for the
+ *       definition.
+ *   <li>description: description for the transformation. Optional for the definition.
+ * </ul>
+ */
 public class TransformDef {
     private final String sourceTable;
     private final String projection;
