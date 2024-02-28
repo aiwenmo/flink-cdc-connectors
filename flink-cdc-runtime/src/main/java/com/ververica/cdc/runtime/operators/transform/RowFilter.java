@@ -20,7 +20,7 @@ import com.ververica.cdc.common.data.RecordData;
 import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.utils.StringUtils;
-import com.ververica.cdc.runtime.parser.JaninoParser;
+import com.ververica.cdc.runtime.parser.JaninoCompiler;
 import com.ververica.cdc.runtime.parser.TransformParser;
 import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
 import org.codehaus.janino.ExpressionEvaluator;
@@ -61,7 +61,7 @@ public class RowFilter {
         return Optional.of(of(filterExpression, scriptExpression, columnNames));
     }
 
-    public boolean run(BinaryRecordData after, TableInfo tableInfo) {
+    public boolean process(BinaryRecordData after, TableInfo tableInfo) {
         if (expressionEvaluator == null) {
             cacheExpressionEvaluator(tableInfo);
         }
@@ -97,8 +97,8 @@ public class RowFilter {
         }
         if (expressionEvaluator == null) {
             expressionEvaluator =
-                    JaninoParser.compileExpression(
-                            JaninoParser.loadSystemFunction(scriptExpression),
+                    JaninoCompiler.compileExpression(
+                            JaninoCompiler.loadSystemFunction(scriptExpression),
                             columnNames,
                             paramTypes,
                             Boolean.class);

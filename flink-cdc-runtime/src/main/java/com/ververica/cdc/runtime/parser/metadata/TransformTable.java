@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.runtime.parser.validate;
+package com.ververica.cdc.runtime.parser.metadata;
 
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
@@ -26,14 +26,14 @@ import org.apache.calcite.util.Pair;
 import java.util.ArrayList;
 import java.util.List;
 
-/** FlinkCDCTable to generate the metadata of calcite. */
-public class FlinkCDCTable extends AbstractTable {
+/** TransformTable to generate the metadata of calcite. */
+public class TransformTable extends AbstractTable {
 
     private String name;
 
     private List<Column> columns;
 
-    public FlinkCDCTable(String name, List<Column> columns) {
+    public TransformTable(String name, List<Column> columns) {
         this.name = name;
         this.columns = columns;
     }

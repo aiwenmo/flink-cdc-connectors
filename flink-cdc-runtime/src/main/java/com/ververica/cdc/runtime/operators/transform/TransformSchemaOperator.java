@@ -146,7 +146,7 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
             event = cacheChangeSchema((SchemaChangeEvent) event);
             output.collect(new StreamRecord<>(event));
         } else if (event instanceof DataChangeEvent) {
-            output.collect(new StreamRecord<>(applyDataChangeEvent(((DataChangeEvent) event))));
+            output.collect(new StreamRecord<>(processDataChangeEvent(((DataChangeEvent) event))));
         }
     }
 
@@ -177,27 +177,28 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
             if (selectors.isMatch(tableId) && transform.f1.isPresent()) {
                 Projector projector = transform.f1.get();
                 // update the columns of projection and add the column of projection into Schema
-                return projector.applyCreateTableEvent(createTableEvent);
+                return projector.processCreateTableEvent(createTableEvent);
             }
         }
         return createTableEvent;
     }
 
-    private DataChangeEvent applyDataChangeEvent(DataChangeEvent dataChangeEvent) throws Exception {
+    private DataChangeEvent processDataChangeEvent(DataChangeEvent dataChangeEvent)
+            throws Exception {
         TableId tableId = dataChangeEvent.tableId();
         for (Tuple2<Selectors, Optional<Projector>> transform : transforms) {
             Selectors selectors = transform.f0;
             if (selectors.isMatch(tableId) && transform.f1.isPresent()) {
                 Projector projector = transform.f1.get();
                 if (projector.isValid()) {
-                    return applyProjection(projector, dataChangeEvent);
+                    return processProjection(projector, dataChangeEvent);
                 }
             }
         }
         return dataChangeEvent;
     }
 
-    private DataChangeEvent applyProjection(Projector projector, DataChangeEvent dataChangeEvent)
+    private DataChangeEvent processProjection(Projector projector, DataChangeEvent dataChangeEvent)
             throws Exception {
         TableId tableId = dataChangeEvent.tableId();
         TableChangeInfo tableChangeInfo = tableChangeInfoMap.get(tableId);

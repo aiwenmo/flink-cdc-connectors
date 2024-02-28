@@ -66,6 +66,18 @@ public class TransformDataOperatorTest {
                     .primaryKey("colString")
                     .build();
 
+    private static final TableId METADATA_TABLEID =
+            TableId.tableId("my_company", "my_branch", "metadata_table");
+    private static final Schema METADATA_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("col1", DataTypes.STRING())
+                    .physicalColumn("identifier_name", DataTypes.STRING())
+                    .physicalColumn("__namespace_name__", DataTypes.STRING())
+                    .physicalColumn("__database_name__", DataTypes.STRING())
+                    .physicalColumn("__table_name__", DataTypes.STRING())
+                    .primaryKey("col1")
+                    .build();
+
     @Test
     void testDataChangeEventTransform() throws Exception {
         TransformDataOperator transform =
@@ -311,8 +323,8 @@ public class TransformDataOperatorTest {
         TransformDataOperator transform =
                 TransformDataOperator.newBuilder()
                         .addTransform(
-                                CUSTOMERS_TABLEID.identifier(),
-                                "*, concat(__database_name__,concat('.',__table_name__)) col12",
+                                METADATA_TABLEID.identifier(),
+                                "*, __namespace_name__ || '.' || __database_name__ || '.' || __table_name__ identifier_name, __namespace_name__, __database_name__, __table_name__",
                                 null)
                         .build();
         EventOperatorTestHarness<TransformDataOperator, Event>
@@ -321,33 +333,32 @@ public class TransformDataOperatorTest {
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
-        CreateTableEvent createTableEvent =
-                new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA);
+        CreateTableEvent createTableEvent = new CreateTableEvent(METADATA_TABLEID, METADATA_SCHEMA);
         BinaryRecordDataGenerator recordDataGenerator =
-                new BinaryRecordDataGenerator(((RowType) CUSTOMERS_SCHEMA.toRowDataType()));
+                new BinaryRecordDataGenerator(((RowType) METADATA_SCHEMA.toRowDataType()));
         // Insert
         DataChangeEvent insertEvent =
                 DataChangeEvent.insertEvent(
-                        CUSTOMERS_TABLEID,
+                        METADATA_TABLEID,
                         recordDataGenerator.generate(
-                                new Object[] {
-                                    new BinaryStringData("1"), new BinaryStringData("2"), null
-                                }));
+                                new Object[] {new BinaryStringData("1"), null, null, null, null}));
         DataChangeEvent insertEventExpect =
                 DataChangeEvent.insertEvent(
-                        CUSTOMERS_TABLEID,
+                        METADATA_TABLEID,
                         recordDataGenerator.generate(
                                 new Object[] {
                                     new BinaryStringData("1"),
-                                    new BinaryStringData("2"),
-                                    new BinaryStringData("my_branch.customers")
+                                    new BinaryStringData("my_company.my_branch.metadata_table"),
+                                    new BinaryStringData("my_company"),
+                                    new BinaryStringData("my_branch"),
+                                    new BinaryStringData("metadata_table")
                                 }));
         transform.processElement(new StreamRecord<>(createTableEvent));
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(
                         new StreamRecord<>(
-                                new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA)));
+                                new CreateTableEvent(METADATA_TABLEID, METADATA_SCHEMA)));
         transform.processElement(new StreamRecord<>(insertEvent));
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())

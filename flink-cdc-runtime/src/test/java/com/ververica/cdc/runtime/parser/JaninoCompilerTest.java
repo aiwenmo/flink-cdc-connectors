@@ -33,8 +33,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
 import java.util.List;
 
-/** Unit tests for the {@link JaninoParser}. */
-public class JaninoParserTest {
+/** Unit tests for the {@link JaninoCompiler}. */
+public class JaninoCompilerTest {
 
     @Test
     public void testJaninoParser() throws CompileException, IOException, InvocationTargetException {
@@ -43,12 +43,11 @@ public class JaninoParserTest {
         ExpressionEvaluator expressionEvaluator = new ExpressionEvaluator();
         expressionEvaluator.cook(parser);
         Object evaluate = expressionEvaluator.evaluate();
-        Assert.assertEquals(evaluate, false);
+        Assert.assertEquals(false, evaluate);
     }
 
     @Test
-    public void testJaninoUnParser()
-            throws CompileException, IOException, InvocationTargetException {
+    public void testJaninoUnParser() {
         String expression = "1 <= 2";
         String[] values = new String[1];
         values[0] = "1";
@@ -62,7 +61,7 @@ public class JaninoParserTest {
         Unparser unparser = new Unparser(writer);
         unparser.unparseAtom(binaryOperation);
         unparser.close();
-        Assert.assertEquals(writer.toString(), expression);
+        Assert.assertEquals(expression, writer.toString());
     }
 
     @Test
@@ -72,9 +71,10 @@ public class JaninoParserTest {
         List<Class<?>> paramTypes = Arrays.asList(Double.class);
         List<Object> params = Arrays.asList(3.14);
         ExpressionEvaluator expressionEvaluator =
-                JaninoParser.compileExpression(expression, columnNames, paramTypes, Boolean.class);
+                JaninoCompiler.compileExpression(
+                        expression, columnNames, paramTypes, Boolean.class);
         Object evaluate = expressionEvaluator.evaluate(params.toArray());
-        Assert.assertEquals(evaluate, true);
+        Assert.assertEquals(true, evaluate);
     }
 
     @Test
@@ -84,8 +84,9 @@ public class JaninoParserTest {
         List<Class<?>> paramTypes = Arrays.asList(String.class);
         List<Object> params = Arrays.asList("2");
         ExpressionEvaluator expressionEvaluator =
-                JaninoParser.compileExpression(expression, columnNames, paramTypes, Boolean.class);
+                JaninoCompiler.compileExpression(
+                        expression, columnNames, paramTypes, Boolean.class);
         Object evaluate = expressionEvaluator.evaluate(params.toArray());
-        Assert.assertEquals(evaluate, true);
+        Assert.assertEquals(true, evaluate);
     }
 }

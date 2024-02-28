@@ -55,6 +55,10 @@ public class TableInfo {
         return tableId.getSchemaName();
     }
 
+    public String getNamespace() {
+        return tableId.getNamespace();
+    }
+
     public TableId getTableId() {
         return tableId;
     }

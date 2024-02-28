@@ -22,8 +22,8 @@ import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.common.utils.StringUtils;
 import com.ververica.cdc.runtime.operators.transform.ColumnTransform;
-import com.ververica.cdc.runtime.parser.validate.FlinkCDCOperatorTable;
-import com.ververica.cdc.runtime.parser.validate.FlinkCDCSchemaFactory;
+import com.ververica.cdc.runtime.parser.metadata.TransformSchemaFactory;
+import com.ververica.cdc.runtime.parser.metadata.TransformSqlOperatorTable;
 import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
 import org.apache.calcite.config.CalciteConnectionConfigImpl;
 import org.apache.calcite.config.Lex;
@@ -57,6 +57,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -69,6 +70,7 @@ public class TransformParser {
     private static final Logger LOG = LoggerFactory.getLogger(TransformParser.class);
     private static final String DEFAULT_SCHEMA = "default_schema";
     private static final String DEFAULT_TABLE = "TB";
+    public static final String DEFAULT_NAMESPACE_NAME = "__namespace_name__";
     public static final String DEFAULT_DATABASE_NAME = "__database_name__";
     public static final String DEFAULT_TABLE_NAME = "__table_name__";
 
@@ -82,21 +84,14 @@ public class TransformParser {
     }
 
     private static RelNode sqlToRel(List<Column> columns, SqlNode sqlNode) {
-        List<Column> columnsWithMetadata = new ArrayList<>(columns);
-        if (sqlNode.toString().contains(DEFAULT_DATABASE_NAME)) {
-            columnsWithMetadata.add(
-                    Column.physicalColumn(DEFAULT_DATABASE_NAME, DataTypes.STRING()));
-        }
-        if (sqlNode.toString().contains(DEFAULT_TABLE_NAME)) {
-            columnsWithMetadata.add(Column.physicalColumn(DEFAULT_TABLE_NAME, DataTypes.STRING()));
-        }
+        List<Column> columnsWithMetadata = copyFillMetadataColumn(sqlNode.toString(), columns);
         CalciteSchema rootSchema = CalciteSchema.createRootSchema(true);
         Map<String, Object> operand = new HashMap<>();
         operand.put("tableName", DEFAULT_TABLE);
         operand.put("columns", columnsWithMetadata);
         rootSchema.add(
                 DEFAULT_SCHEMA,
-                FlinkCDCSchemaFactory.INSTANCE.create(rootSchema.plus(), DEFAULT_SCHEMA, operand));
+                TransformSchemaFactory.INSTANCE.create(rootSchema.plus(), DEFAULT_SCHEMA, operand));
         SqlTypeFactoryImpl factory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
         CalciteCatalogReader calciteCatalogReader =
                 new CalciteCatalogReader(
@@ -104,11 +99,11 @@ public class TransformParser {
                         rootSchema.path(DEFAULT_SCHEMA),
                         factory,
                         new CalciteConnectionConfigImpl(new Properties()));
-        FlinkCDCOperatorTable flinkCDCOperatorTable = FlinkCDCOperatorTable.instance();
+        TransformSqlOperatorTable transformSqlOperatorTable = TransformSqlOperatorTable.instance();
         SqlStdOperatorTable sqlStdOperatorTable = SqlStdOperatorTable.instance();
         SqlValidator validator =
                 SqlValidatorUtil.newValidator(
-                        SqlOperatorTables.chain(sqlStdOperatorTable, flinkCDCOperatorTable),
+                        SqlOperatorTables.chain(sqlStdOperatorTable, transformSqlOperatorTable),
                         calciteCatalogReader,
                         factory,
                         SqlValidator.Config.DEFAULT.withIdentifierExpansion(true));
@@ -133,7 +128,6 @@ public class TransformParser {
             sqlNode = getCalciteParser(statement).parseQuery();
         } catch (SqlParseException e) {
             LOG.error("Statements can not be parsed. {} \n {}", statement, e);
-            e.printStackTrace();
         }
         if (sqlNode instanceof SqlSelect) {
             return (SqlSelect) sqlNode;
@@ -174,8 +168,7 @@ public class TransformParser {
                             columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
                         }
                     }
-                    if (DEFAULT_TABLE_NAME.equals(columnName)
-                            || DEFAULT_DATABASE_NAME.equals(columnName)) {
+                    if (isMetadataColumn(columnName)) {
                         continue;
                     }
                     ColumnTransform columnTransform =
@@ -185,7 +178,7 @@ public class TransformParser {
                                             DataTypeConverter.convertCalciteRelDataTypeToDataType(
                                                     relDataTypeMap.get(columnName)),
                                             transformOptional.get().toString(),
-                                            JaninoParser.translateSqlNodeToJaninoExpression(
+                                            JaninoCompiler.translateSqlNodeToJaninoExpression(
                                                     transformOptional.get()),
                                             parseColumnNameList(transformOptional.get()))
                                     : ColumnTransform.of(
@@ -210,15 +203,22 @@ public class TransformParser {
             } else if (sqlNode instanceof SqlIdentifier) {
                 SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode;
                 String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
-                if (DEFAULT_TABLE_NAME.equals(columnName)
-                        || DEFAULT_DATABASE_NAME.equals(columnName)) {
-                    continue;
+                if (isMetadataColumn(columnName)) {
+                    columnTransformList.add(
+                            ColumnTransform.of(
+                                    columnName,
+                                    DataTypeConverter.convertCalciteRelDataTypeToDataType(
+                                            relDataTypeMap.get(columnName)),
+                                    columnName,
+                                    columnName,
+                                    Arrays.asList(columnName)));
+                } else {
+                    columnTransformList.add(
+                            ColumnTransform.of(
+                                    columnName,
+                                    DataTypeConverter.convertCalciteRelDataTypeToDataType(
+                                            relDataTypeMap.get(columnName))));
                 }
-                columnTransformList.add(
-                        ColumnTransform.of(
-                                columnName,
-                                DataTypeConverter.convertCalciteRelDataTypeToDataType(
-                                        relDataTypeMap.get(columnName))));
             } else {
                 throw new ParseException("Unrecognized projection: " + sqlNode.toString());
             }
@@ -238,7 +238,7 @@ public class TransformParser {
         if (!(where instanceof SqlBasicCall)) {
             throw new ParseException("Unrecognized where: " + where.toString());
         }
-        return JaninoParser.translateSqlNodeToJaninoExpression((SqlBasicCall) where);
+        return JaninoCompiler.translateSqlNodeToJaninoExpression((SqlBasicCall) where);
     }
 
     public static List<String> parseComputedColumnNames(String projection) {
@@ -270,7 +270,12 @@ public class TransformParser {
                     throw new ParseException("Unrecognized projection: " + sqlBasicCall.toString());
                 }
             } else if (sqlNode instanceof SqlIdentifier) {
-                continue;
+                String columnName = sqlNode.toString();
+                if (isMetadataColumn(columnName) && !columnNames.contains(columnName)) {
+                    columnNames.add(columnName);
+                } else {
+                    continue;
+                }
             } else {
                 throw new ParseException("Unrecognized projection: " + sqlNode.toString());
             }
@@ -327,6 +332,37 @@ public class TransformParser {
         statement.append(" FROM ");
         statement.append(DEFAULT_TABLE);
         return parseSelect(statement.toString());
+    }
+
+    private static List<Column> copyFillMetadataColumn(
+            String transformStatement, List<Column> columns) {
+        List<Column> columnsWithMetadata = new ArrayList<>(columns);
+        if (transformStatement.contains(DEFAULT_NAMESPACE_NAME)
+                && containsMetadataColumn(columns, DEFAULT_NAMESPACE_NAME)) {
+            columnsWithMetadata.add(
+                    Column.physicalColumn(DEFAULT_NAMESPACE_NAME, DataTypes.STRING()));
+        }
+        if (transformStatement.contains(DEFAULT_DATABASE_NAME)
+                && containsMetadataColumn(columns, DEFAULT_DATABASE_NAME)) {
+            columnsWithMetadata.add(
+                    Column.physicalColumn(DEFAULT_DATABASE_NAME, DataTypes.STRING()));
+        }
+        if (transformStatement.contains(DEFAULT_TABLE_NAME)
+                && containsMetadataColumn(columns, DEFAULT_TABLE_NAME)) {
+            columnsWithMetadata.add(Column.physicalColumn(DEFAULT_TABLE_NAME, DataTypes.STRING()));
+        }
+        return columnsWithMetadata;
+    }
+
+    private static boolean containsMetadataColumn(List<Column> columns, String columnName) {
+        columns.stream().anyMatch(column -> column.getName().equals(columnName));
+        return false;
+    }
+
+    private static boolean isMetadataColumn(String columnName) {
+        return DEFAULT_TABLE_NAME.equals(columnName)
+                || DEFAULT_DATABASE_NAME.equals(columnName)
+                || DEFAULT_NAMESPACE_NAME.equals(columnName);
     }
 
     public static SqlSelect parseFilterExpression(String filterExpression) {

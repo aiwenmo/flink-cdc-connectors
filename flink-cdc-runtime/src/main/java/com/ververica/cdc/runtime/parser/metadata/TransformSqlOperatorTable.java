@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.runtime.parser.validate;
+package com.ververica.cdc.runtime.parser.metadata;
 
 import com.ververica.cdc.runtime.functions.BuiltInScalarFunction;
 import com.ververica.cdc.runtime.functions.BuiltInTimestampFunction;
@@ -40,16 +40,16 @@ import javax.annotation.Nullable;
 
 import java.util.List;
 
-/** FlinkCDCOperatorTable to generate the metadata of calcite. */
-public class FlinkCDCOperatorTable extends ReflectiveSqlOperatorTable {
+/** TransformSqlOperatorTable to generate the metadata of calcite. */
+public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
 
-    private static FlinkCDCOperatorTable instance;
+    private static TransformSqlOperatorTable instance;
 
-    private FlinkCDCOperatorTable() {}
+    private TransformSqlOperatorTable() {}
 
-    public static synchronized FlinkCDCOperatorTable instance() {
+    public static synchronized TransformSqlOperatorTable instance() {
         if (instance == null) {
-            instance = new FlinkCDCOperatorTable();
+            instance = new TransformSqlOperatorTable();
             instance.init();
         }
 

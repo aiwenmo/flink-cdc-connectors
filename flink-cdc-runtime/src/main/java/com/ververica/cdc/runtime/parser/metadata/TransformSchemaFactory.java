@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.runtime.parser.validate;
+package com.ververica.cdc.runtime.parser.metadata;
 
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.utils.StringUtils;
@@ -26,12 +26,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-/** FlinkCDCSchemaFactory to generate the metadata of calcite. */
-public class FlinkCDCSchemaFactory implements SchemaFactory {
+/** TransformSchemaFactory to generate the metadata of calcite. */
+public class TransformSchemaFactory implements SchemaFactory {
 
-    public static final FlinkCDCSchemaFactory INSTANCE = new FlinkCDCSchemaFactory();
+    public static final TransformSchemaFactory INSTANCE = new TransformSchemaFactory();
 
-    private FlinkCDCSchemaFactory() {}
+    private TransformSchemaFactory() {}
 
     @Override
     public Schema create(SchemaPlus schemaPlus, String schemaName, Map<String, Object> operand) {
@@ -40,6 +40,7 @@ public class FlinkCDCSchemaFactory implements SchemaFactory {
         }
         String tableName = String.valueOf(operand.get("tableName"));
         List<Column> columns = (List<Column>) operand.get("columns");
-        return new FlinkCDCSchema(schemaName, Arrays.asList(new FlinkCDCTable(tableName, columns)));
+        return new TransformSchema(
+                schemaName, Arrays.asList(new TransformTable(tableName, columns)));
     }
 }

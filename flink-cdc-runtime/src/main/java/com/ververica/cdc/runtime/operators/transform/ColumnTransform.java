@@ -21,7 +21,7 @@ import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.utils.StringUtils;
-import com.ververica.cdc.runtime.parser.JaninoParser;
+import com.ververica.cdc.runtime.parser.JaninoCompiler;
 import com.ververica.cdc.runtime.parser.TransformParser;
 import com.ververica.cdc.runtime.typeutils.DataTypeConverter;
 import org.codehaus.janino.ExpressionEvaluator;
@@ -41,7 +41,7 @@ public class ColumnTransform implements Serializable {
     private final String expression;
     private final String scriptExpression;
     private final List<String> originalColumnNames;
-    private ExpressionEvaluator expressionEvaluator;
+    private transient ExpressionEvaluator expressionEvaluator;
 
     public ColumnTransform(
             Column column,
@@ -72,7 +72,7 @@ public class ColumnTransform implements Serializable {
 
     public Object evaluate(BinaryRecordData after, TableInfo tableInfo) {
         if (expressionEvaluator == null) {
-            cacheExpressionEvaluator(tableInfo);
+            lazilyInitializeExpressionEvaluator(tableInfo);
         }
         try {
             return expressionEvaluator.evaluate(generateParams(after, tableInfo));
@@ -92,6 +92,18 @@ public class ColumnTransform implements Serializable {
         List<Column> columns = tableInfo.getSchema().getColumns();
         RecordData.FieldGetter[] fieldGetters = tableInfo.getFieldGetters();
         for (String originalColumnName : originalColumnNames) {
+            if (originalColumnName.equals(TransformParser.DEFAULT_NAMESPACE_NAME)) {
+                params.add(tableInfo.getNamespace());
+                continue;
+            }
+            if (originalColumnName.equals(TransformParser.DEFAULT_DATABASE_NAME)) {
+                params.add(tableInfo.getSchemaName());
+                continue;
+            }
+            if (originalColumnName.equals(TransformParser.DEFAULT_TABLE_NAME)) {
+                params.add(tableInfo.getTableName());
+                continue;
+            }
             for (int i = 0; i < columns.size(); i++) {
                 Column column = columns.get(i);
                 if (column.getName().equals(originalColumnName)) {
@@ -102,17 +114,10 @@ public class ColumnTransform implements Serializable {
                 }
             }
         }
-        if (scriptExpression.contains(TransformParser.DEFAULT_DATABASE_NAME)) {
-            params.add(tableInfo.getSchemaName());
-        }
-
-        if (scriptExpression.contains(TransformParser.DEFAULT_TABLE_NAME)) {
-            params.add(tableInfo.getTableName());
-        }
         return params.toArray();
     }
 
-    private void cacheExpressionEvaluator(TableInfo tableInfo) {
+    private void lazilyInitializeExpressionEvaluator(TableInfo tableInfo) {
         List<String> argumentNames = new ArrayList<>();
         List<Class<?>> paramTypes = new ArrayList<>();
         List<Column> columns = tableInfo.getSchema().getColumns();
@@ -126,18 +131,26 @@ public class ColumnTransform implements Serializable {
                 }
             }
         }
-        if (scriptExpression.contains(TransformParser.DEFAULT_DATABASE_NAME)) {
+        if (scriptExpression.contains(TransformParser.DEFAULT_NAMESPACE_NAME)
+                && !argumentNames.contains(TransformParser.DEFAULT_NAMESPACE_NAME)) {
+            argumentNames.add(TransformParser.DEFAULT_NAMESPACE_NAME);
+            paramTypes.add(String.class);
+        }
+
+        if (scriptExpression.contains(TransformParser.DEFAULT_DATABASE_NAME)
+                && !argumentNames.contains(TransformParser.DEFAULT_DATABASE_NAME)) {
             argumentNames.add(TransformParser.DEFAULT_DATABASE_NAME);
             paramTypes.add(String.class);
         }
 
-        if (scriptExpression.contains(TransformParser.DEFAULT_TABLE_NAME)) {
+        if (scriptExpression.contains(TransformParser.DEFAULT_TABLE_NAME)
+                && !argumentNames.contains(TransformParser.DEFAULT_TABLE_NAME)) {
             argumentNames.add(TransformParser.DEFAULT_TABLE_NAME);
             paramTypes.add(String.class);
         }
         expressionEvaluator =
-                JaninoParser.compileExpression(
-                        JaninoParser.loadSystemFunction(scriptExpression),
+                JaninoCompiler.compileExpression(
+                        JaninoCompiler.loadSystemFunction(scriptExpression),
                         originalColumnNames,
                         paramTypes,
                         DataTypeConverter.convertOriginalClass(column.getType()));

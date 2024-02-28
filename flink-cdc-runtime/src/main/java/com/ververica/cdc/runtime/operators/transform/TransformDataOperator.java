@@ -31,7 +31,6 @@ import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.event.CreateTableEvent;
 import com.ververica.cdc.common.event.DataChangeEvent;
 import com.ververica.cdc.common.event.Event;
-import com.ververica.cdc.common.event.FlushEvent;
 import com.ververica.cdc.common.event.SchemaChangeEvent;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Schema;
@@ -140,14 +139,12 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
     @Override
     public void processElement(StreamRecord<Event> element) throws Exception {
         Event event = element.getValue();
-        if (event instanceof FlushEvent) {
-            output.collect(new StreamRecord<>(event));
-        } else if (event instanceof SchemaChangeEvent) {
+        if (event instanceof SchemaChangeEvent) {
             event = cacheSchema((SchemaChangeEvent) event);
             output.collect(new StreamRecord<>(event));
         } else if (event instanceof DataChangeEvent) {
             Optional<DataChangeEvent> dataChangeEventOptional =
-                    applyDataChangeEvent(((DataChangeEvent) event));
+                    processDataChangeEvent(((DataChangeEvent) event));
             if (dataChangeEventOptional.isPresent()) {
                 output.collect(new StreamRecord<>(dataChangeEventOptional.get()));
             }
@@ -190,12 +187,12 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
             if (selectors.isMatch(tableId) && transform.f1.isPresent()) {
                 Projector projector = transform.f1.get();
                 // update the columns of projection and add the column of projection into Schema
-                projector.applySchemaChangeEvent(schema);
+                projector.processSchemaChangeEvent(schema);
             }
         }
     }
 
-    private Optional<DataChangeEvent> applyDataChangeEvent(DataChangeEvent dataChangeEvent)
+    private Optional<DataChangeEvent> processDataChangeEvent(DataChangeEvent dataChangeEvent)
             throws Exception {
         TableId tableId = dataChangeEvent.tableId();
         List<Optional<DataChangeEvent>> transformedDataChangeEventOptionalList = new ArrayList<>();
@@ -210,19 +207,21 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
                         && projectorOptional.isPresent()
                         && projectorOptional.get().isValid()) {
                     dataChangeEventOptional =
-                            applyProjection(projectorOptional.get(), dataChangeEventOptional.get());
+                            processProjection(
+                                    projectorOptional.get(), dataChangeEventOptional.get());
                 }
                 Optional<RowFilter> rowFilterOptional = transform.f2;
                 if (rowFilterOptional.isPresent() && rowFilterOptional.get().isVaild()) {
                     dataChangeEventOptional =
-                            applyFilter(rowFilterOptional.get(), dataChangeEventOptional.get());
+                            processFilter(rowFilterOptional.get(), dataChangeEventOptional.get());
                 }
                 if (!isPreProjection
                         && dataChangeEventOptional.isPresent()
                         && projectorOptional.isPresent()
                         && projectorOptional.get().isValid()) {
                     dataChangeEventOptional =
-                            applyProjection(projectorOptional.get(), dataChangeEventOptional.get());
+                            processProjection(
+                                    projectorOptional.get(), dataChangeEventOptional.get());
                 }
                 transformedDataChangeEventOptionalList.add(dataChangeEventOptional);
             }
@@ -240,20 +239,20 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
         }
     }
 
-    private Optional<DataChangeEvent> applyFilter(
+    private Optional<DataChangeEvent> processFilter(
             RowFilter rowFilter, DataChangeEvent dataChangeEvent) throws Exception {
         BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
         BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
-        // insert and update event only apply afterData, delete only apply beforeData
+        // insert and update event only process afterData, delete only process beforeData
         if (after != null) {
-            if (rowFilter.run(
+            if (rowFilter.process(
                     after, getTableInfoFromSchemaEvolutionClient(dataChangeEvent.tableId()))) {
                 return Optional.of(dataChangeEvent);
             } else {
                 return Optional.empty();
             }
         } else if (before != null) {
-            if (rowFilter.run(
+            if (rowFilter.process(
                     before, getTableInfoFromSchemaEvolutionClient(dataChangeEvent.tableId()))) {
                 return Optional.of(dataChangeEvent);
             } else {
@@ -263,7 +262,7 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
         return Optional.empty();
     }
 
-    private Optional<DataChangeEvent> applyProjection(
+    private Optional<DataChangeEvent> processProjection(
             Projector projector, DataChangeEvent dataChangeEvent) throws Exception {
         BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
         BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();

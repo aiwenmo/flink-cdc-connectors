@@ -61,7 +61,7 @@ public class Projector {
                 .collect(Collectors.toList());
     }
 
-    public CreateTableEvent applyCreateTableEvent(CreateTableEvent createTableEvent) {
+    public CreateTableEvent processCreateTableEvent(CreateTableEvent createTableEvent) {
         columnTransformList =
                 TransformParser.generateColumnTransforms(
                         projection, createTableEvent.getSchema().getColumns());
@@ -71,7 +71,7 @@ public class Projector {
         return new CreateTableEvent(createTableEvent.tableId(), schema);
     }
 
-    public void applySchemaChangeEvent(Schema schema) {
+    public void processSchemaChangeEvent(Schema schema) {
         columnTransformList =
                 TransformParser.generateColumnTransforms(projection, schema.getColumns());
     }

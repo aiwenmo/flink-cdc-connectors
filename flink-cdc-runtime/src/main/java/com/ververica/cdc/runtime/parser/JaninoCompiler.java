@@ -36,11 +36,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-/** Use Janino parser to parse the statement of flink cdc pipeline transform. */
-public class JaninoParser {
+/**
+ * Use Janino compiler to compiler the statement of flink cdc pipeline transform into the executable
+ * code of Janino. For example, compiler 'string1 || string2' into 'concat(string1, string2)'. The
+ * core logic is to traverse SqlNode tree and transform to Atom tree. Janino documents:
+ * https://www.janino.net/index.html#properties
+ */
+public class JaninoCompiler {
 
     private static final List<SqlTypeName> SQL_TYPE_NAME_IGNORE = Arrays.asList(SqlTypeName.SYMBOL);
-    private static final List<String> SQL_NAME_CALL_FUNCTION =
+    private static final List<String> NO_OPERAND_TIMESTAMP_FUNCTIONS =
             Arrays.asList(
                     "LOCALTIME",
                     "LOCALTIMESTAMP",
@@ -54,7 +59,7 @@ public class JaninoParser {
     }
 
     public static ExpressionEvaluator compileExpression(
-            String code,
+            String expression,
             List<String> argumentNames,
             List<Class<?>> argumentClasses,
             Class<?> returnClass) {
@@ -63,12 +68,12 @@ public class JaninoParser {
                 argumentNames.toArray(new String[0]), argumentClasses.toArray(new Class[0]));
         expressionEvaluator.setExpressionType(returnClass);
         try {
-            expressionEvaluator.cook(code);
+            expressionEvaluator.cook(expression);
             return expressionEvaluator;
         } catch (CompileException e) {
             throw new InvalidProgramException(
                     "Expression cannot be compiled. This is a bug. Please file an issue.\nExpression: "
-                            + code,
+                            + expression,
                     e);
         }
     }
@@ -97,7 +102,7 @@ public class JaninoParser {
         if (sqlNode instanceof SqlIdentifier) {
             SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode;
             String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
-            if (SQL_NAME_CALL_FUNCTION.contains(columnName)) {
+            if (NO_OPERAND_TIMESTAMP_FUNCTIONS.contains(columnName)) {
                 atoms.add(
                         new Java.MethodInvocation(
                                 Location.NOWHERE,

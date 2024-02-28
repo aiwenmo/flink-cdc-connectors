@@ -21,8 +21,8 @@ import org.apache.flink.table.api.Expressions;
 
 import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.types.DataTypes;
-import com.ververica.cdc.runtime.parser.validate.FlinkCDCOperatorTable;
-import com.ververica.cdc.runtime.parser.validate.FlinkCDCSchemaFactory;
+import com.ververica.cdc.runtime.parser.metadata.TransformSchemaFactory;
+import com.ververica.cdc.runtime.parser.metadata.TransformSqlOperatorTable;
 import org.apache.calcite.config.CalciteConnectionConfigImpl;
 import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.plan.RelOptCluster;
@@ -73,7 +73,7 @@ public class TransformParserTest {
     }
 
     @Test
-    public void testFlinkCalciteValidate() {
+    public void testTransformCalciteValidate() {
         SqlSelect parse =
                 TransformParser.parseSelect(
                         "select SUBSTR(id, 1) as uniq_id, * from tb where id is not null");
@@ -83,7 +83,8 @@ public class TransformParserTest {
         operand.put("tableName", "tb");
         operand.put("columns", CUSTOMERS_SCHEMA.getColumns());
         org.apache.calcite.schema.Schema schema =
-                FlinkCDCSchemaFactory.INSTANCE.create(rootSchema.plus(), "default_schema", operand);
+                TransformSchemaFactory.INSTANCE.create(
+                        rootSchema.plus(), "default_schema", operand);
         rootSchema.add("default_schema", schema);
         SqlTypeFactoryImpl factory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
         CalciteCatalogReader calciteCatalogReader =
@@ -92,11 +93,11 @@ public class TransformParserTest {
                         rootSchema.path("default_schema"),
                         factory,
                         new CalciteConnectionConfigImpl(new Properties()));
-        FlinkCDCOperatorTable flinkCDCOperatorTable = FlinkCDCOperatorTable.instance();
+        TransformSqlOperatorTable transformSqlOperatorTable = TransformSqlOperatorTable.instance();
         SqlStdOperatorTable sqlStdOperatorTable = SqlStdOperatorTable.instance();
         SqlValidator validator =
                 SqlValidatorUtil.newValidator(
-                        SqlOperatorTables.chain(sqlStdOperatorTable, flinkCDCOperatorTable),
+                        SqlOperatorTables.chain(sqlStdOperatorTable, transformSqlOperatorTable),
                         calciteCatalogReader,
                         factory,
                         SqlValidator.Config.DEFAULT.withIdentifierExpansion(true));
@@ -123,7 +124,8 @@ public class TransformParserTest {
         operand.put("tableName", "tb");
         operand.put("columns", CUSTOMERS_SCHEMA.getColumns());
         org.apache.calcite.schema.Schema schema =
-                FlinkCDCSchemaFactory.INSTANCE.create(rootSchema.plus(), "default_schema", operand);
+                TransformSchemaFactory.INSTANCE.create(
+                        rootSchema.plus(), "default_schema", operand);
         rootSchema.add("default_schema", schema);
         SqlTypeFactoryImpl factory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
         CalciteCatalogReader calciteCatalogReader =
@@ -132,11 +134,11 @@ public class TransformParserTest {
                         rootSchema.path("default_schema"),
                         factory,
                         new CalciteConnectionConfigImpl(new Properties()));
-        FlinkCDCOperatorTable flinkCDCOperatorTable = FlinkCDCOperatorTable.instance();
+        TransformSqlOperatorTable transformSqlOperatorTable = TransformSqlOperatorTable.instance();
         SqlStdOperatorTable sqlStdOperatorTable = SqlStdOperatorTable.instance();
         SqlValidator validator =
                 SqlValidatorUtil.newValidator(
-                        SqlOperatorTables.chain(sqlStdOperatorTable, flinkCDCOperatorTable),
+                        SqlOperatorTables.chain(sqlStdOperatorTable, transformSqlOperatorTable),
                         calciteCatalogReader,
                         factory,
                         SqlValidator.Config.DEFAULT.withIdentifierExpansion(true));
