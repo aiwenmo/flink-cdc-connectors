@@ -275,6 +275,9 @@ class FlinkPipelineComposerITCase {
                         "default_namespace.default_schema.table1",
                         "*,concat(col1,'0') as col12",
                         "col1 <> '3'",
+                        "col1",
+                        "col12",
+                        "key1=value1",
                         "");
 
         // Setup pipeline
@@ -296,7 +299,7 @@ class FlinkPipelineComposerITCase {
         String[] outputEvents = outCaptor.toString().trim().split("\n");
         assertThat(outputEvents)
                 .containsExactly(
-                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING,`col12` STRING}, primaryKeys=col1, options=()}",
+                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING,`col12` STRING}, primaryKeys=col1, partitionKeys=col12, options=({key1=value1})}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[1, 1, 10], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[2, 2, 20], op=INSERT, meta=()}",
                         "AddColumnEvent{tableId=default_namespace.default_schema.table1, addedColumns=[ColumnWithPosition{column=`col3` STRING, position=LAST, existedColumnName=null}]}",
@@ -329,12 +332,18 @@ class FlinkPipelineComposerITCase {
                         "default_namespace.default_schema.table1",
                         "*,concat(col1,'1') as col12",
                         "col1 = '1'",
+                        "col1",
+                        "col12",
+                        "key1=value1",
                         "");
         TransformDef transformDef2 =
                 new TransformDef(
                         "default_namespace.default_schema.table1",
                         "*,concat(col1,'2') as col12",
                         "col1 = '2'",
+                        null,
+                        null,
+                        null,
                         "");
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
@@ -355,7 +364,7 @@ class FlinkPipelineComposerITCase {
         String[] outputEvents = outCaptor.toString().trim().split("\n");
         assertThat(outputEvents)
                 .containsExactly(
-                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING,`col12` STRING}, primaryKeys=col1, options=()}",
+                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING,`col12` STRING}, primaryKeys=col1, partitionKeys=col12, options=({key1=value1})}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[1, 1, 11], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[2, 2, 22], op=INSERT, meta=()}",
                         "AddColumnEvent{tableId=default_namespace.default_schema.table1, addedColumns=[ColumnWithPosition{column=`col3` STRING, position=LAST, existedColumnName=null}]}",

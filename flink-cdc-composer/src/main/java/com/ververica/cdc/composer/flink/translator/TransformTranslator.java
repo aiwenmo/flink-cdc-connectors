@@ -41,7 +41,11 @@ public class TransformTranslator {
         for (TransformDef transform : transforms) {
             if (transform.isValidProjection()) {
                 transformSchemaFunctionBuilder.addTransform(
-                        transform.getSourceTable(), transform.getProjection().get());
+                        transform.getSourceTable(),
+                        transform.getProjection().get(),
+                        transform.getPrimaryKeys(),
+                        transform.getPartitionKeys(),
+                        transform.getTableOptions());
             }
         }
         return input.transform(

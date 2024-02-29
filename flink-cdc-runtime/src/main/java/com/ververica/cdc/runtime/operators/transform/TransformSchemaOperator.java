@@ -20,6 +20,7 @@ import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.state.OperatorStateStore;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple5;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
@@ -51,9 +52,11 @@ import java.util.stream.Collectors;
 public class TransformSchemaOperator extends AbstractStreamOperator<Event>
         implements OneInputStreamOperator<Event, Event> {
 
-    private final List<Tuple2<String, String>> transformRules;
+    private final List<Tuple5<String, String, String, String, String>> transformRules;
     private transient List<Tuple2<Selectors, Optional<Projector>>> transforms;
     private final Map<TableId, TableChangeInfo> tableChangeInfoMap;
+
+    private final List<Tuple2<Selectors, SchemaMetadataTransform>> schemaMetadataTransformers;
     private transient ListState<byte[]> state;
 
     public static TransformSchemaOperator.Builder newBuilder() {
@@ -62,11 +65,17 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
 
     /** Builder of {@link TransformSchemaOperator}. */
     public static class Builder {
-        private final List<Tuple2<String, String>> transformRules = new ArrayList<>();
+        private final List<Tuple5<String, String, String, String, String>> transformRules =
+                new ArrayList<>();
 
         public TransformSchemaOperator.Builder addTransform(
-                String tableInclusions, @Nullable String projection) {
-            transformRules.add(Tuple2.of(tableInclusions, projection));
+                String tableInclusions,
+                @Nullable String projection,
+                String primaryKey,
+                String partitionKey,
+                String tableOption) {
+            transformRules.add(
+                    Tuple5.of(tableInclusions, projection, primaryKey, partitionKey, tableOption));
             return this;
         }
 
@@ -75,30 +84,32 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
         }
     }
 
-    private TransformSchemaOperator(List<Tuple2<String, String>> transformRules) {
+    private TransformSchemaOperator(
+            List<Tuple5<String, String, String, String, String>> transformRules) {
         this.transformRules = transformRules;
         this.tableChangeInfoMap = new ConcurrentHashMap<>();
+        this.schemaMetadataTransformers = new ArrayList<>();
         this.chainingStrategy = ChainingStrategy.ALWAYS;
     }
 
     @Override
     public void open() throws Exception {
         super.open();
-        transforms =
-                transformRules.stream()
-                        .map(
-                                tuple2 -> {
-                                    String tableInclusions = tuple2.f0;
-                                    String projection = tuple2.f1;
-
-                                    Selectors selectors =
-                                            new Selectors.SelectorsBuilder()
-                                                    .includeTables(tableInclusions)
-                                                    .build();
-                                    return new Tuple2<>(
-                                            selectors, Projector.generateProjector(projection));
-                                })
-                        .collect(Collectors.toList());
+        for (Tuple5<String, String, String, String, String> transformRule : transformRules) {
+            String tableInclusions = transformRule.f0;
+            String projection = transformRule.f1;
+            String primaryKeys = transformRule.f2;
+            String partitionKeys = transformRule.f3;
+            String tableOptions = transformRule.f4;
+            Selectors selectors =
+                    new Selectors.SelectorsBuilder().includeTables(tableInclusions).build();
+            transforms = new ArrayList<>();
+            transforms.add(new Tuple2<>(selectors, Projector.generateProjector(projection)));
+            schemaMetadataTransformers.add(
+                    new Tuple2<>(
+                            selectors,
+                            new SchemaMetadataTransform(primaryKeys, partitionKeys, tableOptions)));
+        }
     }
 
     @Override
@@ -172,6 +183,18 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
 
     private CreateTableEvent transformCreateTableEvent(CreateTableEvent createTableEvent) {
         TableId tableId = createTableEvent.tableId();
+
+        for (Tuple2<Selectors, SchemaMetadataTransform> transform : schemaMetadataTransformers) {
+            Selectors selectors = transform.f0;
+            if (selectors.isMatch(tableId)) {
+                createTableEvent =
+                        new CreateTableEvent(
+                                tableId,
+                                transformSchemaMetaData(
+                                        createTableEvent.getSchema(), transform.f1));
+            }
+        }
+
         for (Tuple2<Selectors, Optional<Projector>> transform : transforms) {
             Selectors selectors = transform.f0;
             if (selectors.isMatch(tableId) && transform.f1.isPresent()) {
@@ -181,6 +204,27 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
             }
         }
         return createTableEvent;
+    }
+
+    private Schema transformSchemaMetaData(
+            Schema schema, SchemaMetadataTransform schemaMetadataTransform) {
+        Schema.Builder schemaBuilder = Schema.newBuilder().setColumns(schema.getColumns());
+        if (!schemaMetadataTransform.getPrimaryKeys().isEmpty()) {
+            schemaBuilder.primaryKey(schemaMetadataTransform.getPrimaryKeys());
+        } else {
+            schemaBuilder.primaryKey(schema.primaryKeys());
+        }
+        if (!schemaMetadataTransform.getPartitionKeys().isEmpty()) {
+            schemaBuilder.partitionKey(schemaMetadataTransform.getPartitionKeys());
+        } else {
+            schemaBuilder.partitionKey(schema.partitionKeys());
+        }
+        if (!schemaMetadataTransform.getOptions().isEmpty()) {
+            schemaBuilder.options(schemaMetadataTransform.getOptions());
+        } else {
+            schemaBuilder.options(schema.options());
+        }
+        return schemaBuilder.build();
     }
 
     private DataChangeEvent processDataChangeEvent(DataChangeEvent dataChangeEvent)

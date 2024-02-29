@@ -32,6 +32,7 @@ import com.ververica.cdc.runtime.testutils.operators.EventOperatorTestHarness;
 import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 import java.util.Collections;
 
@@ -57,7 +58,9 @@ public class TransformSchemaOperatorTest {
                     .physicalColumn("col1", DataTypes.STRING())
                     .physicalColumn("col2", DataTypes.STRING())
                     .physicalColumn("col12", DataTypes.STRING())
-                    .primaryKey("col1")
+                    .primaryKey("col2")
+                    .partitionKey("col12")
+                    .options(ImmutableMap.of("key1", "value1", "key2", "value2"))
                     .build();
     private static final Schema EXPECT_LATEST_SCHEMA =
             Schema.newBuilder()
@@ -65,14 +68,21 @@ public class TransformSchemaOperatorTest {
                     .physicalColumn("col2", DataTypes.STRING())
                     .physicalColumn("col12", DataTypes.STRING())
                     .physicalColumn("col3", DataTypes.STRING())
-                    .primaryKey("col1")
+                    .primaryKey("col2")
+                    .partitionKey("col12")
+                    .options(ImmutableMap.of("key1", "value1", "key2", "value2"))
                     .build();
 
     @Test
     void testEventTransform() throws Exception {
         TransformSchemaOperator transform =
                 TransformSchemaOperator.newBuilder()
-                        .addTransform(CUSTOMERS_TABLEID.identifier(), "*, concat(col1,col2) col12")
+                        .addTransform(
+                                CUSTOMERS_TABLEID.identifier(),
+                                "*, concat(col1,col2) col12",
+                                "col2",
+                                "col12",
+                                "key1=value1,key2=value2")
                         .build();
         EventOperatorTestHarness<TransformSchemaOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =

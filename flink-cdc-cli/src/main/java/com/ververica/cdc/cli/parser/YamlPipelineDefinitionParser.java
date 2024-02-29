@@ -62,6 +62,12 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String TRANSFORM_FILTER_KEY = "filter";
     private static final String TRANSFORM_DESCRIPTION_KEY = "description";
 
+    public static final String TRANSFORM_PRIMARY_KEY_KEY = "primary-keys";
+
+    public static final String TRANSFORM_PARTITION_KEY_KEY = "partition-keys";
+
+    public static final String TRANSFORM_TABLE_OPTION_KEY = "table-options";
+
     private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
 
     /** Parse the specified pipeline definition file. */
@@ -183,11 +189,31 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                 Optional.ofNullable(transformNode.get(TRANSFORM_FILTER_KEY))
                         .map(JsonNode::asText)
                         .orElse(null);
+        String primaryKeys =
+                Optional.ofNullable(transformNode.get(TRANSFORM_PRIMARY_KEY_KEY))
+                        .map(JsonNode::asText)
+                        .orElse(null);
+        String partitionKeys =
+                Optional.ofNullable(transformNode.get(TRANSFORM_PARTITION_KEY_KEY))
+                        .map(JsonNode::asText)
+                        .orElse(null);
+        String tableOptions =
+                Optional.ofNullable(transformNode.get(TRANSFORM_TABLE_OPTION_KEY))
+                        .map(JsonNode::asText)
+                        .orElse(null);
         String description =
                 Optional.ofNullable(transformNode.get(TRANSFORM_DESCRIPTION_KEY))
                         .map(JsonNode::asText)
                         .orElse(null);
-        return new TransformDef(sourceTable, projection, filter, description);
+
+        return new TransformDef(
+                sourceTable,
+                projection,
+                filter,
+                primaryKeys,
+                partitionKeys,
+                tableOptions,
+                description);
     }
 
     private Configuration toPipelineConfig(JsonNode pipelineConfigNode) {

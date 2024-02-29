@@ -183,11 +183,17 @@ class YamlPipelineDefinitionParserTest {
                                     "mydb.app_order_.*",
                                     "id, order_id, TO_UPPER(product_name)",
                                     "id > 10 AND order_id > 100",
+                                    "id",
+                                    "product_name",
+                                    "comment=app order",
                                     "project fields from source table"),
                             new TransformDef(
                                     "mydb.web_order_.*",
                                     "CONCAT(id, order_id) as uniq_id, *",
                                     "uniq_id > 10",
+                                    null,
+                                    null,
+                                    null,
                                     "add new uniq_id for each row")),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
@@ -237,11 +243,17 @@ class YamlPipelineDefinitionParserTest {
                                     "mydb.app_order_.*",
                                     "id, order_id, TO_UPPER(product_name)",
                                     "id > 10 AND order_id > 100",
+                                    "id",
+                                    "product_name",
+                                    "comment=app order",
                                     "project fields from source table"),
                             new TransformDef(
                                     "mydb.web_order_.*",
                                     "CONCAT(id, order_id) as uniq_id, *",
                                     "uniq_id > 10",
+                                    null,
+                                    null,
+                                    null,
                                     "add new uniq_id for each row")),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
