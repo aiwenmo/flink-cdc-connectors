@@ -34,10 +34,10 @@ import java.util.Optional;
  *       definition.
  *   <li>primaryKeys: a string for primary key columns for matching input table IDs, seperated by
  *       `,`. Optional for the definition.
- *   <li>filter: a string for partition key columns for matching input table IDs, seperated by `,`.
- *       Optional for the definition.
- *   <li>filter: a string for table options for matching input table IDs, options are seperated by
- *       `,`, key and value are seperated by `=`. Optional for the definition.
+ *   <li>partitionKeys: a string for partition key columns for matching input table IDs, seperated
+ *       by `,`. Optional for the definition.
+ *   <li>tableOptions: a string for table options for matching input table IDs, options are
+ *       seperated by `,`, key and value are seperated by `=`. Optional for the definition.
  *   <li>description: description for the transformation. Optional for the definition.
  * </ul>
  */
