@@ -59,6 +59,12 @@ public class SchemaMetadataTransform implements Serializable {
         if (!StringUtils.isNullOrWhitespaceOnly(tableOptionString)) {
             for (String tableOption : tableOptionString.split(",")) {
                 String[] kv = tableOption.split("=");
+                if (kv.length != 2) {
+                    throw new IllegalArgumentException(
+                            "table option format error: "
+                                    + tableOptionString
+                                    + ", it should be like `key1=value1,key2=value2`.");
+                }
                 options.put(kv[0].trim(), kv[1].trim());
             }
         }
