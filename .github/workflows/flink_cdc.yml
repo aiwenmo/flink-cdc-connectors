@@ -19,6 +19,7 @@ on:
     branches:
       - master
       - release-*
+      - doctest-*
     paths-ignore:
       - 'docs/**'
       - 'README.md'
@@ -26,6 +27,7 @@ on:
     branches:
       - master
       - release-*
+      - doctest-*
     paths-ignore:
       - 'docs/**'
       - 'README.md'
