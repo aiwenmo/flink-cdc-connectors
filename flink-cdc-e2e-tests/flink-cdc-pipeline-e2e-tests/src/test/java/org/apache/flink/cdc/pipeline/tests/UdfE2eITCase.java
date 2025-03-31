@@ -96,6 +96,7 @@ class UdfE2eITCase extends PipelineTestEnvironment {
     @ParameterizedTest(name = "language: {0}, batchMode: {1}")
     @MethodSource(value = "variants")
     void testUserDefinedFunctions(String language, boolean batchMode) throws Exception {
+        String startupMode = batchMode ? "snapshot" : "initial";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -104,6 +105,7 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                                 + "  port: 3306\n"
                                 + "  username: %s\n"
                                 + "  password: %s\n"
+                                + "  scan.startup.mode: %s\n"
                                 + "  tables: %s.\\.*\n"
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
@@ -134,6 +136,7 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
+                        startupMode,
                         transformRenameDatabase.getDatabaseName(),
                         transformRenameDatabase.getDatabaseName(),
                         transformRenameDatabase.getDatabaseName(),
@@ -198,7 +201,12 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Forty-two, Integer: 2014], op=INSERT, meta=()}",
                                 transformRenameDatabase.getDatabaseName()));
         validateResult(expectedEvents);
+
+        if (batchMode) {
+            return;
+        }
         LOG.info("Begin incremental reading stage.");
+
         // generate binlogs
         String mysqlJdbcUrl =
                 String.format(
@@ -240,6 +248,7 @@ class UdfE2eITCase extends PipelineTestEnvironment {
     @ParameterizedTest(name = "language: {0}, batchMode: {1}")
     @MethodSource(value = "variants")
     void testFlinkCompatibleScalarFunctions(String language, boolean batchMode) throws Exception {
+        String startupMode = batchMode ? "snapshot" : "initial";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -248,6 +257,7 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                                 + "  port: 3306\n"
                                 + "  username: %s\n"
                                 + "  password: %s\n"
+                                + "  scan.startup.mode: %s\n"
                                 + "  tables: %s.\\.*\n"
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
@@ -274,6 +284,7 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
+                        startupMode,
                         transformRenameDatabase.getDatabaseName(),
                         transformRenameDatabase.getDatabaseName(),
                         transformRenameDatabase.getDatabaseName(),
@@ -334,6 +345,10 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Integer: 2014], op=INSERT, meta=()}",
                                 transformRenameDatabase.getDatabaseName()));
         validateResult(expectedEvents);
+
+        if (batchMode) {
+            return;
+        }
         LOG.info("Begin incremental reading stage.");
         // generate binlogs
         String mysqlJdbcUrl =
