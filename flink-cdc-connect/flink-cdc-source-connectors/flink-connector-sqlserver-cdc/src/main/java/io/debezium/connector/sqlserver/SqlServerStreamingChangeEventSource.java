@@ -20,6 +20,8 @@ import io.debezium.util.Metronome;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
@@ -27,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Queue;
@@ -99,6 +102,9 @@ public class SqlServerStreamingChangeEventSource
     private final ElapsedTimeStrategy pauseBetweenCommits;
     private final Map<SqlServerPartition, SqlServerStreamingExecutionContext>
             streamingExecutionContexts;
+
+    /** Consecutive communication failures since the last successful streaming iteration. */
+    private int consecutiveConnectionFailures;
 
     public SqlServerStreamingChangeEventSource(
             SqlServerConnectorConfig connectorConfig,
@@ -216,12 +222,14 @@ public class SqlServerStreamingChangeEventSource
                 if (!toLsn.isAvailable()) {
                     LOGGER.warn(
                             "No maximum LSN recorded in the database; please ensure that the SQL Server Agent is running");
+                    markConnectionHealthy();
                     return false;
                 }
                 // There is no change in the database
                 if (toLsn.compareTo(lastProcessedPosition.getCommitLsn()) <= 0
                         && streamingExecutionContext.getShouldIncreaseFromLsn()) {
                     LOGGER.debug("No change in the database");
+                    markConnectionHealthy();
                     return false;
                 }
 
@@ -463,10 +471,109 @@ public class SqlServerStreamingChangeEventSource
                 }
             }
         } catch (Exception e) {
+            if (isRecoverableConnectionFailure(e)) {
+                closeBrokenConnections(databaseName, partition, e);
+                return false;
+            }
             errorHandler.setProducerThrowable(e);
         }
 
+        markConnectionHealthy();
         return true;
+    }
+
+    /**
+     * A dropped TCP session must not restart the Debezium engine. {@code JdbcConnection#close()}
+     * drops the prepared-statement cache that would otherwise keep using the dead connection, and
+     * the next {@code connection()} call opens a new session. Returning {@code false} lets {@link
+     * #execute} wait for the poll interval before the next attempt. The in-memory LSN is unchanged.
+     */
+    private void closeBrokenConnections(
+            String databaseName, SqlServerPartition partition, Exception failure) {
+        consecutiveConnectionFailures++;
+        if (consecutiveConnectionFailures == 1 || consecutiveConnectionFailures % 10 == 0) {
+            LOGGER.warn(
+                    "SQL Server connection failed while streaming database {} (failure {}). "
+                            + "The connection will be re-established on the next poll without restarting "
+                            + "the connector. The current LSN is kept.",
+                    databaseName,
+                    consecutiveConnectionFailures,
+                    failure);
+        } else {
+            LOGGER.debug(
+                    "SQL Server connection is still unavailable for database {} (failure {})",
+                    databaseName,
+                    consecutiveConnectionFailures,
+                    failure);
+        }
+        closeConnection(dataConnection);
+        closeConnection(metadataConnection);
+        SqlServerStreamingExecutionContext executionContext =
+                streamingExecutionContexts.get(partition);
+        if (executionContext != null) {
+            executionContext.getTablesSlot().set(null);
+        }
+    }
+
+    private void markConnectionHealthy() {
+        consecutiveConnectionFailures = 0;
+    }
+
+    private static void closeConnection(SqlServerConnection connection) {
+        if (connection == null) {
+            return;
+        }
+        try {
+            connection.close();
+        } catch (Exception closeFailure) {
+            LOGGER.debug(
+                    "Failed to close SQL Server connection after a communication failure",
+                    closeFailure);
+        }
+    }
+
+    /**
+     * Communication failures are safe to retry from the current LSN. SQL Server error 313 means the
+     * saved CDC window was purged and must still fail fast.
+     */
+    static boolean isRecoverableConnectionFailure(Throwable failure) {
+        Throwable current = failure;
+        while (current != null) {
+            if (current instanceof SocketException || current instanceof SocketTimeoutException) {
+                return true;
+            }
+            if (current instanceof SQLException) {
+                for (SQLException sqlException = (SQLException) current;
+                        sqlException != null;
+                        sqlException = sqlException.getNextException()) {
+                    if (isConnectionSqlException(sqlException)) {
+                        return true;
+                    }
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private static boolean isConnectionSqlException(SQLException sqlException) {
+        if (sqlException.getErrorCode() == INVALID_CDC_LSN_RANGE_ERROR_CODE) {
+            return false;
+        }
+        String sqlState = sqlException.getSQLState();
+        if (sqlState != null && sqlState.startsWith("08")) {
+            return true;
+        }
+        String message = sqlException.getMessage();
+        if (message == null) {
+            return false;
+        }
+        String normalized = message.toLowerCase(Locale.ROOT);
+        return normalized.contains("connection reset")
+                || normalized.contains("connection is closed")
+                || normalized.contains("communication link failure")
+                || message.contains("连接已关闭")
+                || message.contains("通信链路失败");
     }
 
     private void commitTransaction() throws SQLException {
